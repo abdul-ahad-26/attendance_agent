@@ -1,0 +1,37 @@
+# MS Teams Auto-Join Agent Configuration
+# Copy this file to config.yaml and fill in your details.
+
+student:
+  email: "your.email@university.edu"
+
+# Your weekly timetable. Add one entry per class.
+# The agent will auto-join each class at the scheduled time.
+timetable:
+  - name: "Data Structures"
+    day: "Monday"               # Monday, Tuesday, ..., Sunday
+    time: "09:00"               # 24-hour format (HH:MM)
+    duration_minutes: 120       # How long the class lasts
+    team: "CS201 - Data Structures"   # Exact Team name in MS Teams
+    channel: "General"                # Channel where meetings happen
+
+  - name: "Operating Systems"
+    day: "Tuesday"
+    time: "14:00"
+    duration_minutes: 90
+    team: "CS301 - Operating Systems"
+    channel: "Lectures"
+
+settings:
+  join_early_minutes: 3         # Join N minutes before class start
+  stay_extra_minutes: 5         # Stay N minutes after class ends
+  max_wait_for_meeting: 15      # Poll up to N minutes if meeting hasn't started
+  poll_interval_seconds: 15     # How often to check for active meeting
+  retry_join_attempts: 3        # Retry joining if first attempt fails
+
+  browser:
+    headless: false             # Set true once everything works reliably
+    channel: "msedge"           # Browser: msedge, chromium, chrome
+
+  notifications:
+    desktop_toast: true         # Show desktop notifications on join/fail
+    discord_webhook_url: ""     # Optional: paste Discord webhook URL for phone alerts
