@@ -24,10 +24,7 @@ def _find_first(page: Page, selector_list: list, timeout: int = 5_000) -> Option
 
 
 def _click_first(page: Page, selector_list: list, timeout: int = 10_000, description: str = "") -> bool:
-    """Try each selector and click the first visible match.
-
-    Returns True if a click succeeded.
-    """
+    """Try each selector and click the first visible match."""
     for sel in selector_list:
         try:
             loc = page.locator(sel).first
@@ -41,12 +38,61 @@ def _click_first(page: Page, selector_list: list, timeout: int = 10_000, descrip
     return False
 
 
-def navigate_to_channel(page: Page, team_name: str, channel_name: str) -> bool:
-    """Navigate to a specific Team > Channel in the Teams UI.
+def _click_last(page: Page, selector_list: list, timeout: int = 10_000, description: str = "") -> bool:
+    """Try each selector and click the LAST visible match.
 
-    Returns True if the channel view is reached.
+    Used for Join buttons — when multiple meetings show in a channel,
+    the active/current meeting is the most recent one (last on page).
     """
+    for sel in selector_list:
+        try:
+            all_matches = page.locator(sel)
+            count = all_matches.count()
+            if count == 0:
+                continue
+
+            # Click the last match (most recent = active meeting)
+            loc = all_matches.nth(count - 1)
+            loc.wait_for(state="visible", timeout=timeout)
+            loc.click()
+            logger.info("Clicked %s (selector: %s, match %d/%d)", description or sel, sel, count, count)
+            return True
+        except Exception:
+            continue
+    logger.warning("Could not click: %s", description or selector_list[0])
+    return False
+
+
+def close_extra_tabs(page: Page) -> None:
+    """Close any extra tabs that Teams may have opened, keep only the first."""
+    context = page.context
+    while len(context.pages) > 1:
+        extra = context.pages[-1]
+        try:
+            extra.close()
+            logger.info("Closed extra tab.")
+        except Exception:
+            break
+
+
+def dismiss_notification_popup(page: Page) -> None:
+    """Dismiss the Teams notification popup (bottom-right) if present."""
+    try:
+        # The notification popup has a close/X button
+        close_btn = page.locator('[data-tid="notification-close"]').first
+        if close_btn.is_visible(timeout=1_000):
+            close_btn.click()
+            logger.info("Dismissed notification popup.")
+    except Exception:
+        pass
+
+
+def navigate_to_channel(page: Page, team_name: str, channel_name: str) -> bool:
+    """Navigate to a specific Team > Channel in the Teams UI."""
     logger.info("Navigating to %s > %s ...", team_name, channel_name)
+
+    # Close extra tabs first
+    close_extra_tabs(page)
 
     # Step 1: Click Teams in the app bar
     if not _click_first(page, selectors.TEAMS_APP_BAR_TEAMS_BUTTON, description="Teams tab"):
@@ -77,23 +123,34 @@ def is_meeting_active(page: Page) -> bool:
 
 
 def click_join_meeting(page: Page) -> bool:
-    """Click the Join button on the meeting banner in the channel."""
-    return _click_first(page, selectors.MEETING_JOIN_BUTTON, timeout=10_000, description="Join meeting")
+    """Click the Join button on the ACTIVE meeting in the channel.
+
+    Uses _click_last because when multiple meetings exist in a channel,
+    the currently active one is the most recent (last on page).
+    The old/scheduled meetings have grayed out Join buttons that do nothing.
+    """
+    # First try the notification popup Join button (most specific to active meeting)
+    try:
+        notif_join = page.locator('div:has-text("started the meeting") >> button:has-text("Join")').last
+        if notif_join.is_visible(timeout=2_000):
+            notif_join.click()
+            logger.info("Clicked Join from notification popup.")
+            return True
+    except Exception:
+        pass
+
+    # Click the LAST Join button on the page (active meeting = most recent)
+    return _click_last(page, selectors.MEETING_JOIN_BUTTON, timeout=10_000, description="Join meeting")
 
 
 def mute_mic(page: Page) -> bool:
-    """Ensure microphone is muted on the pre-join screen.
-
-    Tries UI selectors first, then falls back to Ctrl+Shift+M keyboard shortcut.
-    """
-    # Try clicking the mic toggle button
+    """Ensure microphone is muted on the pre-join screen."""
     for sel in selectors.MIC_TOGGLE:
         try:
             loc = page.locator(sel).first
             if loc.is_visible(timeout=3_000):
                 aria = (loc.get_attribute("aria-label") or "").lower()
                 logger.info("Found mic toggle (aria-label: '%s')", aria)
-                # Check if already muted (label says "Unmute" = currently muted)
                 if "unmute" in aria:
                     logger.info("Mic already muted.")
                     return True
@@ -103,7 +160,6 @@ def mute_mic(page: Page) -> bool:
         except Exception:
             continue
 
-    # Fallback: keyboard shortcut Ctrl+Shift+M
     logger.info("Mic toggle not found via selectors, using Ctrl+Shift+M shortcut.")
     page.keyboard.press("Control+Shift+m")
     page.wait_for_timeout(500)
@@ -111,17 +167,13 @@ def mute_mic(page: Page) -> bool:
 
 
 def turn_off_camera(page: Page) -> bool:
-    """Ensure camera is off on the pre-join screen.
-
-    Tries UI selectors first, then falls back to Ctrl+Shift+O keyboard shortcut.
-    """
+    """Ensure camera is off on the pre-join screen."""
     for sel in selectors.CAMERA_TOGGLE:
         try:
             loc = page.locator(sel).first
             if loc.is_visible(timeout=3_000):
                 aria = (loc.get_attribute("aria-label") or "").lower()
                 logger.info("Found camera toggle (aria-label: '%s')", aria)
-                # Check if already off (label says "Turn on" = currently off)
                 if "turn on" in aria:
                     logger.info("Camera already off.")
                     return True
@@ -131,7 +183,6 @@ def turn_off_camera(page: Page) -> bool:
         except Exception:
             continue
 
-    # Fallback: keyboard shortcut Ctrl+Shift+O
     logger.info("Camera toggle not found via selectors, using Ctrl+Shift+O shortcut.")
     page.keyboard.press("Control+Shift+o")
     page.wait_for_timeout(500)

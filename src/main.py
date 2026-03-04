@@ -15,7 +15,7 @@ from .browser import BrowserManager
 from .config_loader import ClassEntry, Config, load_config
 from .meeting_joiner import MeetingJoiner
 from .notifier import Notifier
-from .scheduler import build_scheduler
+from .scheduler import run_scheduler
 from .utils import setup_logging
 
 
@@ -137,9 +137,9 @@ def mode_scheduler(config: Config) -> None:
 
     joiner = MeetingJoiner(browser, config.settings)
 
-    def on_class_scheduled(entry: ClassEntry) -> None:
-        """Callback fired by APScheduler when it's time to join a class."""
-        logger.info("Scheduler triggered for: %s", entry.name)
+    def on_class_triggered(entry: ClassEntry) -> None:
+        """Called in the main thread when it's time to join a class."""
+        logger.info("Triggered: %s", entry.name)
         try:
             if joiner.join_class(entry):
                 notifier.meeting_left(entry.name)
@@ -149,26 +149,20 @@ def mode_scheduler(config: Config) -> None:
             logger.exception("Error joining %s: %s", entry.name, e)
             notifier.join_failed(entry.name, str(e))
 
-    scheduler = build_scheduler(config.timetable, config.settings, on_class_scheduled)
-
-    # Graceful shutdown on Ctrl+C
-    def handle_signal(signum, frame):
-        logger.info("Shutting down...")
-        scheduler.shutdown(wait=False)
-        browser.close()
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-
     logger.info("Agent is running. Press Ctrl+C to stop.")
-    logger.info("Scheduled classes:")
-    for cls in config.timetable:
-        logger.info("  - %s: %s %s (%d min)", cls.name, cls.day.capitalize(), cls.time, cls.duration_minutes)
+    logger.info("Today's classes:")
+    from datetime import datetime
+    today = datetime.now().strftime("%A").lower()
+    today_classes = [c for c in config.timetable if c.day == today]
+    if today_classes:
+        for cls in today_classes:
+            logger.info("  - %s at %s (%d min)", cls.name, cls.time, cls.duration_minutes)
+    else:
+        logger.info("  (no classes today)")
 
     try:
-        scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
+        run_scheduler(config.timetable, config.settings, on_class_triggered)
+    except KeyboardInterrupt:
         logger.info("Agent stopped.")
     finally:
         browser.close()

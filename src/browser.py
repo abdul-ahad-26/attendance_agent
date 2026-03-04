@@ -15,8 +15,16 @@ logger = logging.getLogger("attendance_agent")
 BROWSER_DATA_DIR = Path(__file__).resolve().parent.parent / "browser_data"
 TEAMS_URL = "https://teams.microsoft.com/?web=1"
 
+# All possible Teams domains (microsoft.com redirects to cloud.microsoft)
+TEAMS_DOMAINS = ["teams.microsoft.com", "teams.cloud.microsoft"]
+
 # URLs that indicate the user is on a login page (not yet authenticated)
 LOGIN_URLS = ["login.microsoftonline.com", "login.live.com", "login.microsoft.com"]
+
+
+def _is_teams_url(url: str) -> bool:
+    """Check if a URL belongs to MS Teams (any known domain)."""
+    return any(domain in url for domain in TEAMS_DOMAINS)
 
 
 class BrowserManager:
@@ -63,7 +71,7 @@ class BrowserManager:
                 "--disable-popup-blocking",
                 "--auto-select-desktop-capture-source=Entire screen",
             ],
-            viewport={"width": 1280, "height": 900},
+            viewport={"width": 1920, "height": 1080},
             locale="en-US",
         )
 
@@ -80,19 +88,18 @@ class BrowserManager:
         """Navigate to Teams web app and wait for redirects to settle."""
         page = self.page
         current = page.url
-        if "teams.microsoft.com" not in current:
+        if not _is_teams_url(current):
             logger.info("Navigating to Teams...")
             page.goto(TEAMS_URL, wait_until="domcontentloaded", timeout=60_000)
 
-        # Wait for redirects to settle (Teams may redirect through login)
-        # Poll URL for up to 30s until it stabilizes on teams.microsoft.com
+        # Wait for redirects to settle (teams.microsoft.com -> teams.cloud.microsoft)
         logger.info("Waiting for Teams to load (current URL: %s)...", page.url)
         for _ in range(15):
             page.wait_for_timeout(2_000)
             url = page.url
             logger.debug("Current URL: %s", url)
             on_login = any(lurl in url for lurl in LOGIN_URLS)
-            if "teams.microsoft.com" in url and not on_login:
+            if _is_teams_url(url) and not on_login:
                 logger.info("Teams loaded. URL: %s", url)
                 return
         logger.warning("Teams may not have fully loaded. URL: %s", page.url)
@@ -115,18 +122,9 @@ class BrowserManager:
                 logger.warning("On login page: %s", url)
                 return False
 
-        # If we're on teams.microsoft.com, we're likely logged in
-        if "teams.microsoft.com" in url:
-            # Double-check: try to find any Teams UI element
-            for selector in selectors.LOGGED_IN_INDICATOR:
-                try:
-                    if page.locator(selector).first.is_visible(timeout=5_000):
-                        return True
-                except Exception:
-                    continue
-            # Even if selectors didn't match, URL says we're on Teams
-            # (selectors may be outdated but session is valid)
-            logger.info("On Teams URL but no UI selector matched - assuming logged in.")
+        # If we're on any Teams domain, we're logged in
+        if _is_teams_url(url):
+            logger.info("On Teams - logged in.")
             return True
 
         return False
@@ -152,7 +150,7 @@ class BrowserManager:
 
             # Check if we've landed on Teams (not a login page)
             on_login_page = any(lurl in url for lurl in LOGIN_URLS)
-            if "teams.microsoft.com" in url and not on_login_page:
+            if _is_teams_url(url) and not on_login_page:
                 logger.info("Login detected! URL: %s", url)
                 # Give the app a moment to load
                 page.wait_for_timeout(3_000)
