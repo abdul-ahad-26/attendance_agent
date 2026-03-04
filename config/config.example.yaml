@@ -1,30 +1,56 @@
-# MS Teams Auto-Join Agent Configuration
-# Copy this file to config.yaml and fill in your details.
+# ============================================================
+# MS Teams Auto-Join Agent - Configuration
+# ============================================================
+#
+# SETUP:
+#   1. Copy this file:  cp config.example.yaml config.yaml
+#   2. Edit config.yaml with YOUR email, timetable, and team/channel names
+#   3. config.yaml is gitignored - your data stays private
+#
+# ============================================================
 
 student:
-  email: "your.email@university.edu"
+  email: "your.email@university.edu"    # Your university email (used for reference only)
 
-# Your weekly timetable. Add one entry per class.
-# The agent will auto-join each class at the scheduled time.
+# Your weekly class timetable.
+# Add one entry per class session. If a class repeats on multiple days,
+# add a separate entry for each day.
+#
+# Fields:
+#   name             - Any label you want (shown in logs/notifications)
+#   day              - Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+#   time             - Class start time in 24-hour format (HH:MM)
+#   duration_minutes - How long the class lasts in minutes
+#   team             - Exact Team name as it appears in MS Teams
+#   channel          - Exact Channel name under that team
+
 timetable:
-  - name: "Data Structures"
-    day: "Monday"               # Monday, Tuesday, ..., Sunday
-    time: "09:00"               # 24-hour format (HH:MM)
-    duration_minutes: 120       # How long the class lasts
-    team: "CS201 - Data Structures"   # Exact Team name in MS Teams
-    channel: "General"                # Channel where meetings happen
+  - name: "Data Structures (Mon)"
+    day: "Monday"
+    time: "09:00"
+    duration_minutes: 120
+    team: "Your Team Name"
+    channel: "General"
 
-  - name: "Operating Systems"
-    day: "Tuesday"
-    time: "14:00"
+  - name: "Algorithms (Mon)"
+    day: "Monday"
+    time: "11:00"
     duration_minutes: 90
-    team: "CS301 - Operating Systems"
-    channel: "Lectures"
+    team: "Your Team Name"
+    channel: "Algorithms"
+
+  # Add more classes below...
+  # - name: "Another Class (Tue)"
+  #   day: "Tuesday"
+  #   time: "14:00"
+  #   duration_minutes: 60
+  #   team: "Your Team Name"
+  #   channel: "Channel Name"
 
 settings:
   join_early_minutes: 3         # Join N minutes before class start
   stay_extra_minutes: 5         # Stay N minutes after class ends
-  max_wait_for_meeting: 15      # Poll up to N minutes if meeting hasn't started
+  max_wait_for_meeting: 15      # Poll up to N minutes if meeting hasn't started yet
   poll_interval_seconds: 15     # How often to check for active meeting
   retry_join_attempts: 3        # Retry joining if first attempt fails
 
@@ -34,4 +60,4 @@ settings:
 
   notifications:
     desktop_toast: true         # Show desktop notifications on join/fail
-    discord_webhook_url: ""     # Optional: paste Discord webhook URL for phone alerts
+    discord_webhook_url: ""     # Optional: Discord webhook URL for phone alerts

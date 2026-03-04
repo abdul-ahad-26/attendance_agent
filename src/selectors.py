@@ -3,6 +3,9 @@
 Every UI interaction references selectors from this file.
 Each selector is a list of alternatives tried in order (first match wins).
 Update these when Teams UI changes.
+
+Note: New Teams (2024+) uses data-cid attributes. Old Teams used data-tid.
+Both are included for compatibility.
 """
 
 # ---------------------------------------------------------------------------
@@ -10,6 +13,7 @@ Update these when Teams UI changes.
 # ---------------------------------------------------------------------------
 TEAMS_APP_BAR_TEAMS_BUTTON = [
     '[data-tid="app-bar-Teams"]',
+    '[data-cid="app-bar-Teams"]',
     'button[aria-label="Teams"]',
     'button:has-text("Teams")',
 ]
@@ -24,6 +28,7 @@ def team_item(team_name: str) -> list:
     return [
         f'[data-tid="team-{team_name}-li"]',
         f'div.team-name:has-text("{team_name}")',
+        f'[aria-label*="{team_name}"]',
         f'text="{team_name}"',
     ]
 
@@ -33,6 +38,7 @@ def channel_item(channel_name: str) -> list:
     return [
         f'[data-tid="channel-{channel_name}-li"]',
         f'a[aria-label*="{channel_name}"]',
+        f'[data-cid] >> text="{channel_name}"',
         f'span:has-text("{channel_name}")',
     ]
 
@@ -42,6 +48,7 @@ def channel_item(channel_name: str) -> list:
 # ---------------------------------------------------------------------------
 MEETING_JOIN_BUTTON = [
     '[data-tid="join-btn"]',
+    '[data-cid="join-btn"]',
     'button[aria-label*="Join"]',
     'button:has-text("Join")',
 ]
@@ -49,7 +56,9 @@ MEETING_JOIN_BUTTON = [
 # Indicates an active/ongoing meeting in the channel header area
 ACTIVE_MEETING_INDICATOR = [
     '[data-tid="meeting-active-indicator"]',
+    '[data-cid="meeting-active-indicator"]',
     '[data-tid="join-btn"]',
+    '[data-cid="join-btn"]',
     'div:has-text("Meeting started")',
     'button:has-text("Join")',
 ]
@@ -58,20 +67,26 @@ ACTIVE_MEETING_INDICATOR = [
 # Pre-join screen (mic/camera toggles + "Join now" button)
 # ---------------------------------------------------------------------------
 MIC_TOGGLE = [
+    '[data-cid="calling-pre-join-mic-button"]',
     '[data-tid="toggle-mute"]',
+    '[data-tid="prejoin-audio-toggle"]',
+    'button[aria-label*="Mic"]',
     'button[aria-label*="Mute"]',
     'button[aria-label*="microphone"]',
     '#microphone-toggle',
 ]
 
 CAMERA_TOGGLE = [
+    '[data-cid="calling-pre-join-camera-button"]',
     '[data-tid="toggle-video"]',
+    '[data-tid="prejoin-video-toggle"]',
     'button[aria-label*="Camera"]',
     'button[aria-label*="video"]',
     '#video-toggle',
 ]
 
 JOIN_NOW_BUTTON = [
+    '[data-cid="calling-pre-join-join-button"]',
     '[data-tid="prejoin-join-button"]',
     'button:has-text("Join now")',
     'button[aria-label="Join now"]',
@@ -81,6 +96,7 @@ JOIN_NOW_BUTTON = [
 # In-meeting controls
 # ---------------------------------------------------------------------------
 HANGUP_BUTTON = [
+    '[data-cid="calling-hangup-button"]',
     '[data-tid="hangup-btn"]',
     'button[aria-label="Leave"]',
     'button[aria-label*="Hang up"]',
@@ -89,9 +105,11 @@ HANGUP_BUTTON = [
 
 # Used to verify we are still in a meeting
 IN_MEETING_INDICATOR = [
+    '[data-cid="calling-hangup-button"]',
     '[data-tid="calling-roster"]',
     '[data-tid="hangup-btn"]',
     'button[aria-label="Leave"]',
+    'button[aria-label*="Hang up"]',
 ]
 
 # ---------------------------------------------------------------------------
@@ -99,6 +117,7 @@ IN_MEETING_INDICATOR = [
 # ---------------------------------------------------------------------------
 LOGGED_IN_INDICATOR = [
     '[data-tid="app-bar-Teams"]',
+    '[data-cid="app-bar-Teams"]',
     'button[aria-label="Teams"]',
     '#app-bar-Teams',
 ]

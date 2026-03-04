@@ -84,46 +84,58 @@ def click_join_meeting(page: Page) -> bool:
 def mute_mic(page: Page) -> bool:
     """Ensure microphone is muted on the pre-join screen.
 
-    Clicks the mic toggle. Teams defaults to mic ON, so one click mutes it.
-    If the mic is already showing as muted, we skip.
+    Tries UI selectors first, then falls back to Ctrl+Shift+M keyboard shortcut.
     """
+    # Try clicking the mic toggle button
     for sel in selectors.MIC_TOGGLE:
         try:
             loc = page.locator(sel).first
-            if loc.is_visible(timeout=5_000):
-                aria = loc.get_attribute("aria-label") or ""
-                aria_pressed = loc.get_attribute("aria-pressed")
-                # If aria-label says "Unmute" or aria-pressed is "false", mic is already muted
-                if "unmute" in aria.lower() or aria_pressed == "false":
+            if loc.is_visible(timeout=3_000):
+                aria = (loc.get_attribute("aria-label") or "").lower()
+                logger.info("Found mic toggle (aria-label: '%s')", aria)
+                # Check if already muted (label says "Unmute" = currently muted)
+                if "unmute" in aria:
                     logger.info("Mic already muted.")
                     return True
                 loc.click()
-                logger.info("Muted microphone.")
+                logger.info("Muted microphone via button.")
                 return True
         except Exception:
             continue
-    logger.warning("Could not find mic toggle.")
-    return False
+
+    # Fallback: keyboard shortcut Ctrl+Shift+M
+    logger.info("Mic toggle not found via selectors, using Ctrl+Shift+M shortcut.")
+    page.keyboard.press("Control+Shift+m")
+    page.wait_for_timeout(500)
+    return True
 
 
 def turn_off_camera(page: Page) -> bool:
-    """Ensure camera is off on the pre-join screen."""
+    """Ensure camera is off on the pre-join screen.
+
+    Tries UI selectors first, then falls back to Ctrl+Shift+O keyboard shortcut.
+    """
     for sel in selectors.CAMERA_TOGGLE:
         try:
             loc = page.locator(sel).first
-            if loc.is_visible(timeout=5_000):
-                aria = loc.get_attribute("aria-label") or ""
-                aria_pressed = loc.get_attribute("aria-pressed")
-                if "turn on" in aria.lower() or aria_pressed == "false":
+            if loc.is_visible(timeout=3_000):
+                aria = (loc.get_attribute("aria-label") or "").lower()
+                logger.info("Found camera toggle (aria-label: '%s')", aria)
+                # Check if already off (label says "Turn on" = currently off)
+                if "turn on" in aria:
                     logger.info("Camera already off.")
                     return True
                 loc.click()
-                logger.info("Turned off camera.")
+                logger.info("Turned off camera via button.")
                 return True
         except Exception:
             continue
-    logger.warning("Could not find camera toggle.")
-    return False
+
+    # Fallback: keyboard shortcut Ctrl+Shift+O
+    logger.info("Camera toggle not found via selectors, using Ctrl+Shift+O shortcut.")
+    page.keyboard.press("Control+Shift+o")
+    page.wait_for_timeout(500)
+    return True
 
 
 def click_join_now(page: Page) -> bool:

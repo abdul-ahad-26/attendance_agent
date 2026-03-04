@@ -58,12 +58,11 @@ class BrowserManager:
             channel=self.channel,
             headless=self.headless,
             args=[
-                "--use-fake-device-for-media-stream",
                 "--use-fake-ui-for-media-stream",
                 "--disable-notifications",
                 "--disable-popup-blocking",
+                "--auto-select-desktop-capture-source=Entire screen",
             ],
-            ignore_default_args=["--mute-audio"],
             viewport={"width": 1280, "height": 900},
             locale="en-US",
         )
@@ -78,17 +77,25 @@ class BrowserManager:
         return self._page
 
     def navigate_to_teams(self) -> None:
-        """Navigate to Teams web app."""
+        """Navigate to Teams web app and wait for redirects to settle."""
         page = self.page
         current = page.url
         if "teams.microsoft.com" not in current:
             logger.info("Navigating to Teams...")
             page.goto(TEAMS_URL, wait_until="domcontentloaded", timeout=60_000)
-            # Don't use networkidle - Teams is a SPA that never stops network activity.
-            # Just wait a few seconds for the app to render.
-            page.wait_for_timeout(5_000)
-        else:
-            logger.info("Already on Teams.")
+
+        # Wait for redirects to settle (Teams may redirect through login)
+        # Poll URL for up to 30s until it stabilizes on teams.microsoft.com
+        logger.info("Waiting for Teams to load (current URL: %s)...", page.url)
+        for _ in range(15):
+            page.wait_for_timeout(2_000)
+            url = page.url
+            logger.debug("Current URL: %s", url)
+            on_login = any(lurl in url for lurl in LOGIN_URLS)
+            if "teams.microsoft.com" in url and not on_login:
+                logger.info("Teams loaded. URL: %s", url)
+                return
+        logger.warning("Teams may not have fully loaded. URL: %s", page.url)
 
     def is_logged_in(self) -> bool:
         """Check if the user is currently logged in to Teams.
@@ -100,10 +107,12 @@ class BrowserManager:
         page = self.page
         url = page.url
 
+        logger.info("Checking login status. Current URL: %s", url)
+
         # If we're on a login page, definitely not logged in
         for login_url in LOGIN_URLS:
             if login_url in url:
-                logger.debug("On login page: %s", url)
+                logger.warning("On login page: %s", url)
                 return False
 
         # If we're on teams.microsoft.com, we're likely logged in

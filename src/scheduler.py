@@ -60,7 +60,6 @@ def build_scheduler(
             day_of_week=day_abbrev,
             hour=hour,
             minute=minute,
-            misfire_grace_time=300,  # 5 min grace if PC was asleep
         )
 
         scheduler.add_job(
@@ -70,6 +69,7 @@ def build_scheduler(
             id=f"class_{entry.name}_{entry.day}_{entry.time}",
             name=f"{entry.name} ({entry.day} {entry.time})",
             replace_existing=True,
+            misfire_grace_time=300,  # 5 min grace if PC was asleep
         )
 
         logger.info(

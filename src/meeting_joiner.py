@@ -145,6 +145,10 @@ class MeetingJoiner:
                 # Wait and verify we're in the meeting
                 page.wait_for_timeout(5_000)
                 if is_in_meeting(page):
+                    # Mute mic again after joining (safety net)
+                    logger.info("In meeting. Ensuring mic is muted...")
+                    page.keyboard.press("Control+Shift+m")
+                    page.wait_for_timeout(500)
                     return True
 
                 logger.warning("Join verification failed (attempt %d).", attempt + 1)
