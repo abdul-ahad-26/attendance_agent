@@ -34,19 +34,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ### 2. Clone and install
 
-Using **uv** (recommended):
-
-```bash
-git clone <repo-url>
-cd attendance_agent
-uv venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
-uv pip install -r requirements.txt
-playwright install msedge
-```
-
-Using **pip** (alternative):
-
 ```bash
 git clone <repo-url>
 cd attendance_agent
