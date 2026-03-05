@@ -10,6 +10,9 @@ from . import selectors
 
 logger = logging.getLogger("attendance_agent")
 
+# aria-labels that indicate a dropdown/options button, NOT the actual toggle
+SKIP_ARIA_KEYWORDS = ["option", "selected", "open", "choose", "device"]
+
 
 def _find_first(page: Page, selector_list: list, timeout: int = 5_000) -> Optional[Locator]:
     """Try each selector in the list and return the first visible match."""
@@ -51,7 +54,6 @@ def _click_last(page: Page, selector_list: list, timeout: int = 10_000, descript
             if count == 0:
                 continue
 
-            # Click the last match (most recent = active meeting)
             loc = all_matches.nth(count - 1)
             loc.wait_for(state="visible", timeout=timeout)
             loc.click()
@@ -61,6 +63,12 @@ def _click_last(page: Page, selector_list: list, timeout: int = 10_000, descript
             continue
     logger.warning("Could not click: %s", description or selector_list[0])
     return False
+
+
+def _is_dropdown_button(aria: str) -> bool:
+    """Check if an aria-label indicates a dropdown/options button, not a toggle."""
+    aria_lower = aria.lower()
+    return any(kw in aria_lower for kw in SKIP_ARIA_KEYWORDS)
 
 
 def close_extra_tabs(page: Page) -> None:
@@ -75,24 +83,14 @@ def close_extra_tabs(page: Page) -> None:
             break
 
 
-def dismiss_notification_popup(page: Page) -> None:
-    """Dismiss the Teams notification popup (bottom-right) if present."""
-    try:
-        # The notification popup has a close/X button
-        close_btn = page.locator('[data-tid="notification-close"]').first
-        if close_btn.is_visible(timeout=1_000):
-            close_btn.click()
-            logger.info("Dismissed notification popup.")
-    except Exception:
-        pass
-
-
 def navigate_to_channel(page: Page, team_name: str, channel_name: str) -> bool:
     """Navigate to a specific Team > Channel in the Teams UI."""
     logger.info("Navigating to %s > %s ...", team_name, channel_name)
 
-    # Close extra tabs first
     close_extra_tabs(page)
+
+    # Wait for page to be interactive before clicking
+    page.wait_for_timeout(2_000)
 
     # Step 1: Click Teams in the app bar
     if not _click_first(page, selectors.TEAMS_APP_BAR_TEAMS_BUTTON, description="Teams tab"):
@@ -104,7 +102,7 @@ def navigate_to_channel(page: Page, team_name: str, channel_name: str) -> bool:
     if not _click_first(page, team_sels, timeout=10_000, description=f"Team '{team_name}'"):
         logger.error("Team '%s' not found in the list.", team_name)
         return False
-    page.wait_for_timeout(1_500)
+    page.wait_for_timeout(2_000)
 
     # Step 3: Find and click the channel
     channel_sels = selectors.channel_item(channel_name)
@@ -123,12 +121,7 @@ def is_meeting_active(page: Page) -> bool:
 
 
 def click_join_meeting(page: Page) -> bool:
-    """Click the Join button on the ACTIVE meeting in the channel.
-
-    Uses _click_last because when multiple meetings exist in a channel,
-    the currently active one is the most recent (last on page).
-    The old/scheduled meetings have grayed out Join buttons that do nothing.
-    """
+    """Click the Join button on the ACTIVE meeting in the channel."""
     # First try the notification popup Join button (most specific to active meeting)
     try:
         notif_join = page.locator('div:has-text("started the meeting") >> button:has-text("Join")').last
@@ -144,12 +137,29 @@ def click_join_meeting(page: Page) -> bool:
 
 
 def mute_mic(page: Page) -> bool:
-    """Ensure microphone is muted on the pre-join screen."""
+    """Ensure microphone is muted on the pre-join screen.
+
+    Skips dropdown/options buttons (aria-label containing 'options', 'selected',
+    'open', 'device') and only clicks the actual mute toggle.
+    Falls back to Ctrl+Shift+M keyboard shortcut.
+    """
     for sel in selectors.MIC_TOGGLE:
         try:
-            loc = page.locator(sel).first
-            if loc.is_visible(timeout=3_000):
+            # Check ALL matches for this selector, skip dropdowns
+            all_matches = page.locator(sel)
+            count = all_matches.count()
+            for i in range(count):
+                loc = all_matches.nth(i)
+                if not loc.is_visible(timeout=2_000):
+                    continue
                 aria = (loc.get_attribute("aria-label") or "").lower()
+
+                # Skip dropdown/options buttons
+                if _is_dropdown_button(aria):
+                    logger.debug("Skipping dropdown button: '%s'", aria)
+                    continue
+
+                # Found the actual toggle
                 logger.info("Found mic toggle (aria-label: '%s')", aria)
                 if "unmute" in aria:
                     logger.info("Mic already muted.")
@@ -160,19 +170,32 @@ def mute_mic(page: Page) -> bool:
         except Exception:
             continue
 
-    logger.info("Mic toggle not found via selectors, using Ctrl+Shift+M shortcut.")
+    # Fallback: keyboard shortcut always works
+    logger.info("Using Ctrl+Shift+M to mute mic.")
     page.keyboard.press("Control+Shift+m")
     page.wait_for_timeout(500)
     return True
 
 
 def turn_off_camera(page: Page) -> bool:
-    """Ensure camera is off on the pre-join screen."""
+    """Ensure camera is off on the pre-join screen.
+
+    Same approach as mute_mic: skips dropdown buttons, falls back to shortcut.
+    """
     for sel in selectors.CAMERA_TOGGLE:
         try:
-            loc = page.locator(sel).first
-            if loc.is_visible(timeout=3_000):
+            all_matches = page.locator(sel)
+            count = all_matches.count()
+            for i in range(count):
+                loc = all_matches.nth(i)
+                if not loc.is_visible(timeout=2_000):
+                    continue
                 aria = (loc.get_attribute("aria-label") or "").lower()
+
+                if _is_dropdown_button(aria):
+                    logger.debug("Skipping dropdown button: '%s'", aria)
+                    continue
+
                 logger.info("Found camera toggle (aria-label: '%s')", aria)
                 if "turn on" in aria:
                     logger.info("Camera already off.")
@@ -183,7 +206,7 @@ def turn_off_camera(page: Page) -> bool:
         except Exception:
             continue
 
-    logger.info("Camera toggle not found via selectors, using Ctrl+Shift+O shortcut.")
+    logger.info("Using Ctrl+Shift+O to turn off camera.")
     page.keyboard.press("Control+Shift+o")
     page.wait_for_timeout(500)
     return True

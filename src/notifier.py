@@ -71,15 +71,24 @@ class Notifier:
         if self.settings.discord_webhook_url:
             send_discord_webhook(self.settings.discord_webhook_url, title, message)
 
-    def join_success(self, class_name: str) -> None:
-        self.notify("Joined Class", f"Successfully joined: {class_name}")
+    def join_success(self, class_name: str, stay_minutes: int = 0) -> None:
+        msg = f"Successfully joined: {class_name}"
+        if stay_minutes > 0:
+            msg += f" (staying ~{stay_minutes} min)"
+        self.notify("Joined Class", msg)
 
     def join_failed(self, class_name: str, reason: str = "") -> None:
         detail = f" ({reason})" if reason else ""
         self.notify("Join Failed", f"Could not join: {class_name}{detail}")
 
+    def meeting_not_found(self, class_name: str) -> None:
+        self.notify("No Meeting Found", f"No active meeting for: {class_name}. Class may be cancelled.")
+
     def meeting_left(self, class_name: str) -> None:
         self.notify("Class Ended", f"Left meeting: {class_name}")
+
+    def browser_crashed(self, class_name: str) -> None:
+        self.notify("Browser Crashed", f"Lost connection during: {class_name}. Will retry next class.")
 
     def session_expired(self) -> None:
         self.notify("Session Expired", "Teams login expired. Run --login to re-authenticate.")

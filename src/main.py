@@ -100,12 +100,8 @@ def mode_join_now(config: Config, class_name: str) -> None:
 
     try:
         browser.start()
-        joiner = MeetingJoiner(browser, config.settings)
-
-        if joiner.join_class(entry):
-            notifier.meeting_left(entry.name)
-        else:
-            notifier.join_failed(entry.name)
+        joiner = MeetingJoiner(browser, config.settings, notifier)
+        joiner.join_class(entry)
     except KeyboardInterrupt:
         logger.info("Interrupted by user.")
     except Exception as e:
@@ -135,16 +131,13 @@ def mode_scheduler(config: Config) -> None:
 
     logger.info("Session valid. Starting scheduler...")
 
-    joiner = MeetingJoiner(browser, config.settings)
+    joiner = MeetingJoiner(browser, config.settings, notifier)
 
-    def on_class_triggered(entry: ClassEntry) -> None:
+    def on_class_triggered(entry: ClassEntry, leave_by=None) -> None:
         """Called in the main thread when it's time to join a class."""
         logger.info("Triggered: %s", entry.name)
         try:
-            if joiner.join_class(entry):
-                notifier.meeting_left(entry.name)
-            else:
-                notifier.join_failed(entry.name)
+            joiner.join_class(entry, leave_by=leave_by)
         except Exception as e:
             logger.exception("Error joining %s: %s", entry.name, e)
             notifier.join_failed(entry.name, str(e))
@@ -165,7 +158,10 @@ def mode_scheduler(config: Config) -> None:
     except KeyboardInterrupt:
         logger.info("Agent stopped.")
     finally:
-        browser.close()
+        try:
+            browser.close()
+        except Exception:
+            pass
 
 
 def main():

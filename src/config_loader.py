@@ -114,8 +114,9 @@ def load_config(config_path: str | Path | None = None) -> Config:
     # Student
     student = raw.get("student", {})
     email = student.get("email", "")
-    if not email or email == "your.email@university.edu":
-        raise ValueError("Please set your email in config.yaml")
+    placeholders = {"your.email@university.edu", "23-AI-XX@students.duet.edu.pk"}
+    if not email or email in placeholders:
+        raise ValueError("Please set your email in config.yaml (change XX to your roll number)")
 
     # Timetable
     timetable_raw = raw.get("timetable", [])

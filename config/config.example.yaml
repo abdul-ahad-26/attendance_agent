@@ -1,51 +1,115 @@
 # ============================================================
 # MS Teams Auto-Join Agent - Configuration
+# DUET AI 6th Semester - Spring 2026 (Batch 2023)
 # ============================================================
 #
 # SETUP:
 #   1. Copy this file:  cp config.example.yaml config.yaml
-#   2. Edit config.yaml with YOUR email, timetable, and team/channel names
-#   3. config.yaml is gitignored - your data stays private
+#   2. Change the email below to YOUR roll number
+#   3. That's it! Timetable is already filled in for your batch.
+#   4. config.yaml is gitignored - your email stays private
 #
 # ============================================================
 
 student:
-  email: "your.email@university.edu"    # Your university email (used for reference only)
-
-# Your weekly class timetable.
-# Add one entry per class session. If a class repeats on multiple days,
-# add a separate entry for each day.
-#
-# Fields:
-#   name             - Any label you want (shown in logs/notifications)
-#   day              - Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
-#   time             - Class start time in 24-hour format (HH:MM)
-#   duration_minutes - How long the class lasts in minutes
-#   team             - Exact Team name as it appears in MS Teams
-#   channel          - Exact Channel name under that team
+  email: "23-AI-XX@students.duet.edu.pk"    # <-- Change XX to your roll number
 
 timetable:
-  - name: "Data Structures (Mon)"
+  # ==================== MONDAY ====================
+  - name: "Computer Vision (Mon)"
     day: "Monday"
     time: "09:00"
     duration_minutes: 120
-    team: "Your Team Name"
-    channel: "General"
+    team: "Spring 2026 Batch 2023"
+    channel: "Computer Vision"
 
-  - name: "Algorithms (Mon)"
+  - name: "Operating Systems (Mon)"
     day: "Monday"
     time: "11:00"
-    duration_minutes: 90
-    team: "Your Team Name"
-    channel: "Algorithms"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Operating Systems"
 
-  # Add more classes below...
-  # - name: "Another Class (Tue)"
-  #   day: "Tuesday"
-  #   time: "14:00"
-  #   duration_minutes: 60
-  #   team: "Your Team Name"
-  #   channel: "Channel Name"
+  - name: "Research Methodology (Mon)"
+    day: "Monday"
+    time: "15:00"
+    duration_minutes: 105
+    team: "Spring 2026 Batch 2023"
+    channel: "Research Methodology"
+
+  # ==================== TUESDAY ====================
+  - name: "Parallel and Distributed Computing (Tue)"
+    day: "Tuesday"
+    time: "09:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Parallel and Distributed Computing"
+
+  - name: "Computer Vision (Tue)"
+    day: "Tuesday"
+    time: "11:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Computer Vision"
+
+  - name: "Entrepreneurship (Tue)"
+    day: "Tuesday"
+    time: "14:00"
+    duration_minutes: 165
+    team: "Spring 2026 Batch 2023"
+    channel: "Entrepreneurship"
+
+  # ==================== WEDNESDAY ====================
+  - name: "Knowledge Representation and Reasoning (Wed)"
+    day: "Wednesday"
+    time: "09:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Knowledge Representation and Reasoning"
+
+  - name: "Parallel and Distributed Computing (Wed)"
+    day: "Wednesday"
+    time: "11:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Parallel and Distributed Computing"
+
+  - name: "Entrepreneurship (Wed)"
+    day: "Wednesday"
+    time: "14:00"
+    duration_minutes: 115
+    team: "Spring 2026 Batch 2023"
+    channel: "Entrepreneurship"
+
+  # ==================== THURSDAY ====================
+  - name: "Knowledge Representation and Reasoning (Thu)"
+    day: "Thursday"
+    time: "09:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Knowledge Representation and Reasoning"
+
+  - name: "Operating Systems (Thu)"
+    day: "Thursday"
+    time: "11:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Operating Systems"
+
+  - name: "Research Methodology (Thu)"
+    day: "Thursday"
+    time: "15:00"
+    duration_minutes: 105
+    team: "Spring 2026 Batch 2023"
+    channel: "Research Methodology"
+
+  # ==================== FRIDAY (3-5 PM) ====================
+  - name: "Research Methodology (Fri)"
+    day: "Friday"
+    time: "15:00"
+    duration_minutes: 120
+    team: "Spring 2026 Batch 2023"
+    channel: "Research Methodology"
 
 settings:
   join_early_minutes: 3         # Join N minutes before class start

@@ -42,12 +42,35 @@ def _get_class_end(entry: ClassEntry, now: datetime) -> Optional[datetime]:
     return start + timedelta(minutes=entry.duration_minutes)
 
 
+def get_todays_classes(timetable: List[ClassEntry], now: datetime) -> List[ClassEntry]:
+    """Return today's classes sorted by start time."""
+    today_num = now.weekday()
+    today_classes = [e for e in timetable if DAY_MAP.get(e.day) == today_num]
+    today_classes.sort(key=lambda e: e.time)
+    return today_classes
+
+
+def get_next_class_start(entry: ClassEntry, timetable: List[ClassEntry], now: datetime) -> Optional[datetime]:
+    """Get the start time of the class that comes AFTER the given entry today."""
+    today_classes = get_todays_classes(timetable, now)
+
+    found_current = False
+    for cls in today_classes:
+        if cls.name == entry.name and cls.time == entry.time:
+            found_current = True
+            continue
+        if found_current:
+            start = _get_class_start(cls, now)
+            if start:
+                return start
+    return None
+
+
 def _next_occurrence(entry: ClassEntry, early_minutes: int, now: datetime) -> datetime:
     """Calculate the next datetime this class should be joined."""
     day_num = DAY_MAP[entry.day]
     hour, minute = int(entry.time.split(":")[0]), int(entry.time.split(":")[1])
 
-    # Subtract early_minutes for the join trigger time
     total_minutes = hour * 60 + minute - early_minutes
     if total_minutes < 0:
         total_minutes += 24 * 60
@@ -60,10 +83,8 @@ def _next_occurrence(entry: ClassEntry, early_minutes: int, now: datetime) -> da
     target = now.replace(hour=join_hour, minute=join_minute, second=0, microsecond=0) + timedelta(days=days_ahead)
 
     if target <= now:
-        # Check if class is still ongoing today — if so, don't skip to next week
         class_end = _get_class_end(entry, now)
         if class_end and now < class_end:
-            # Class is still running, return the join time (even though it's in the past)
             return target
         target += timedelta(weeks=1)
 
@@ -73,7 +94,7 @@ def _next_occurrence(entry: ClassEntry, early_minutes: int, now: datetime) -> da
 def find_next_class(timetable: List[ClassEntry], early_minutes: int, now: datetime) -> Optional[tuple]:
     """Find the next class to join (or currently ongoing class).
 
-    Returns (ClassEntry, next_join_datetime) or None if timetable is empty.
+    Returns (ClassEntry, next_join_datetime) or None.
     """
     if not timetable:
         return None
@@ -81,15 +102,12 @@ def find_next_class(timetable: List[ClassEntry], early_minutes: int, now: dateti
     best_entry = None
     best_time = None
 
-    # First priority: any class that is currently ongoing and not yet joined
     for entry in timetable:
         class_start = _get_class_start(entry, now)
         class_end = _get_class_end(entry, now)
         if class_start and class_end and class_start <= now <= class_end:
-            # This class is happening right now
             return entry, class_start
 
-    # Otherwise find the next upcoming class
     for entry in timetable:
         next_time = _next_occurrence(entry, early_minutes, now)
         if next_time > now and (best_time is None or next_time < best_time):
@@ -102,14 +120,7 @@ def find_next_class(timetable: List[ClassEntry], early_minutes: int, now: dateti
 
 
 def is_class_joinable(entry: ClassEntry, early_minutes: int, now: datetime) -> bool:
-    """Check if a class should be joined right now.
-
-    Returns True if:
-    - It's the right day, AND
-    - Current time is between (class_start - early_minutes) and class_end
-
-    This means: if the agent starts mid-class, it will still join.
-    """
+    """Check if a class should be joined right now."""
     class_start = _get_class_start(entry, now)
     if class_start is None:
         return False
@@ -120,51 +131,56 @@ def is_class_joinable(entry: ClassEntry, early_minutes: int, now: datetime) -> b
     return join_time <= now <= class_end
 
 
+def _log_time_until(label: str, entry: ClassEntry, target: datetime, now: datetime) -> None:
+    """Log how long until a class fires."""
+    if target > now:
+        time_until = target - now
+        hours, remainder = divmod(int(time_until.total_seconds()), 3600)
+        minutes = remainder // 60
+        logger.info("%s: %s at %s (%dh %dm from now)", label, entry.name, target.strftime("%a %H:%M"), hours, minutes)
+    else:
+        logger.info("%s: %s (now)", label, entry.name)
+
+
 def run_scheduler(
     timetable: List[ClassEntry],
     settings: Settings,
-    join_callback: Callable[[ClassEntry], None],
+    join_callback: Callable[[ClassEntry, Optional[datetime]], None],
 ) -> None:
     """Run the scheduler loop in the main thread.
 
-    Checks every 30 seconds if a class should be joined. All Playwright
-    operations happen in this same thread, avoiding threading issues.
-
-    On startup, immediately detects any ongoing class and joins it.
+    The join_callback receives (ClassEntry, leave_by_datetime_or_None).
     """
     early = settings.join_early_minutes
-    joined_today = set()  # Track (class_name, date) to avoid double-joining
+    joined_today = set()
 
     logger.info("Scheduler running. Checking every 30 seconds.")
 
-    # Check if any class is happening RIGHT NOW on startup
+    # On startup: join any class that is currently in progress
     now = datetime.now()
-    for entry in timetable:
+    for entry in get_todays_classes(timetable, now):
         if is_class_joinable(entry, early, now):
+            key = (entry.name, now.strftime("%Y-%m-%d"))
+            if key in joined_today:
+                continue
+
             class_end = _get_class_end(entry, now)
             remaining = int((class_end - now).total_seconds() // 60) if class_end else 0
             logger.info(">>> Class in progress: %s (%d min remaining). Joining now!", entry.name, remaining)
-            joined_today.add((entry.name, now.strftime("%Y-%m-%d")))
+            joined_today.add(key)
+
+            next_start = get_next_class_start(entry, timetable, now)
             try:
-                join_callback(entry)
+                join_callback(entry, next_start)
             except Exception as e:
                 logger.exception("Error joining %s: %s", entry.name, e)
 
-    # Show what's coming up next
+    # Show what's coming up
     now = datetime.now()
     result = find_next_class(timetable, early, now)
     if result:
         next_entry, next_time = result
-        if next_time > now:
-            time_until = next_time - now
-            hours, remainder = divmod(int(time_until.total_seconds()), 3600)
-            minutes = remainder // 60
-            logger.info(
-                "Next class: %s at %s (%dh %dm from now)",
-                next_entry.name, next_time.strftime("%a %H:%M"), hours, minutes,
-            )
-        else:
-            logger.info("Next class: %s (now)", next_entry.name)
+        _log_time_until("Next class", next_entry, next_time, now)
 
     last_status_log = time.time()
 
@@ -172,7 +188,7 @@ def run_scheduler(
         now = datetime.now()
         today_str = now.strftime("%Y-%m-%d")
 
-        for entry in timetable:
+        for entry in get_todays_classes(timetable, now):
             key = (entry.name, today_str)
             if key in joined_today:
                 continue
@@ -180,29 +196,28 @@ def run_scheduler(
             if is_class_joinable(entry, early, now):
                 logger.info(">>> Time to join: %s", entry.name)
                 joined_today.add(key)
+
+                # Find when the NEXT class starts (so we leave in time)
+                next_start = get_next_class_start(entry, timetable, now)
+                if next_start:
+                    logger.info("Next class after this: %s", next_start.strftime("%H:%M"))
+
                 try:
-                    join_callback(entry)
+                    join_callback(entry, next_start)
                 except Exception as e:
                     logger.exception("Error joining %s: %s", entry.name, e)
 
-        # Clean up old dates from joined_today
+        # Clean up old dates
         joined_today = {(n, d) for n, d in joined_today if d == today_str}
 
-        # Log status every 5 minutes so user knows it's alive
+        # Status log every 5 minutes
         if time.time() - last_status_log >= 300:
             result = find_next_class(timetable, early, now)
             if result:
                 next_entry, next_time = result
-                if next_time > now:
-                    time_until = next_time - now
-                    hours, remainder = divmod(int(time_until.total_seconds()), 3600)
-                    minutes = remainder // 60
-                    logger.info(
-                        "Waiting... Next: %s at %s (%dh %dm)",
-                        next_entry.name, next_time.strftime("%a %H:%M"), hours, minutes,
-                    )
-                else:
-                    logger.info("Ongoing: %s", next_entry.name)
+                _log_time_until("Waiting... Next", next_entry, next_time, now)
+            else:
+                logger.info("No more classes today.")
             last_status_log = time.time()
 
         time.sleep(30)
