@@ -13,6 +13,7 @@ from .teams_navigator import (
     is_meeting_active,
     click_join_meeting,
     mute_mic,
+    mute_mic_in_meeting,
     turn_off_camera,
     click_join_now,
     is_in_meeting,
@@ -199,7 +200,7 @@ class MeetingJoiner:
                 page.wait_for_timeout(5_000)
                 if is_in_meeting(page):
                     logger.info("In meeting. Ensuring mic is muted...")
-                    page.keyboard.press("Control+Shift+m")
+                    mute_mic_in_meeting(page)
                     page.wait_for_timeout(500)
                     return True
 

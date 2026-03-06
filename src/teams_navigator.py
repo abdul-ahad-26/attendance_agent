@@ -217,6 +217,41 @@ def click_join_now(page: Page) -> bool:
     return _click_first(page, selectors.JOIN_NOW_BUTTON, timeout=15_000, description="Join now")
 
 
+def mute_mic_in_meeting(page: Page) -> bool:
+    """Click the mic button in the active meeting to ensure it is muted.
+
+    Checks the aria-label: if already muted (aria says 'Unmute'), skips the click.
+    Falls back to Ctrl+Shift+M if the button is not found.
+    """
+    for sel in selectors.IN_MEETING_MIC_TOGGLE:
+        try:
+            all_matches = page.locator(sel)
+            count = all_matches.count()
+            for i in range(count):
+                loc = all_matches.nth(i)
+                if not loc.is_visible(timeout=2_000):
+                    continue
+                aria = (loc.get_attribute("aria-label") or "").lower()
+
+                if _is_dropdown_button(aria):
+                    continue
+
+                logger.info("Found in-meeting mic button (aria-label: '%s')", aria)
+                if "unmute" in aria:
+                    logger.info("Mic already muted in meeting.")
+                    return True
+                loc.click()
+                logger.info("Clicked mic button to mute in meeting.")
+                return True
+        except Exception:
+            continue
+
+    logger.info("Mic button not found — using Ctrl+Shift+M fallback.")
+    page.keyboard.press("Control+Shift+m")
+    page.wait_for_timeout(500)
+    return True
+
+
 def is_in_meeting(page: Page) -> bool:
     """Check if we are currently inside a meeting."""
     return _find_first(page, selectors.IN_MEETING_INDICATOR, timeout=3_000) is not None

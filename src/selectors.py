@@ -83,6 +83,15 @@ JOIN_NOW_BUTTON = [
 # ---------------------------------------------------------------------------
 # In-meeting controls
 # ---------------------------------------------------------------------------
+IN_MEETING_MIC_TOGGLE = [
+    'button[aria-label="Mute"]',
+    'button[aria-label="Unmute"]',
+    'button[aria-label*="mute"]',
+    'button[aria-label*="Mute"]',
+    '[data-tid="toggle-mute"]',
+    '[data-cid="calling-mute-button"]',
+]
+
 HANGUP_BUTTON = [
     'button[aria-label="Leave"]',
     'button[aria-label*="Hang up"]',

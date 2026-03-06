@@ -156,10 +156,10 @@ def mode_scheduler(config: Config) -> None:
     try:
         run_scheduler(config.timetable, config.settings, on_class_triggered)
     except KeyboardInterrupt:
-        logger.info("Agent stopped.")
+        logger.info("Agent stopped. Browser and meeting remain active.")
     finally:
         try:
-            browser.close()
+            browser.detach()
         except Exception:
             pass
 
