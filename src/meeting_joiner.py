@@ -49,7 +49,7 @@ class MeetingJoiner:
         logger.info("Starting join flow for: %s", name)
         logger.info("Team: %s | Channel: %s", class_entry.team, class_entry.channel)
         if leave_by:
-            logger.info("Must leave by: %s (next class)", leave_by.strftime("%H:%M"))
+            logger.info("Next class starts at: %s (will stay for full duration)", leave_by.strftime("%H:%M"))
         logger.info("=" * 60)
 
         # Check browser is alive
@@ -97,16 +97,6 @@ class MeetingJoiner:
         class_end = now.replace(hour=class_start_hour, minute=class_start_min, second=0) + timedelta(
             minutes=class_entry.duration_minutes
         )
-
-        # If there's a next class, leave before it starts (with 2 min buffer)
-        if leave_by:
-            hard_deadline = leave_by - timedelta(minutes=2)
-            if hard_deadline < class_end:
-                logger.info(
-                    "Cutting stay short: next class at %s (leaving at %s instead of %s)",
-                    leave_by.strftime("%H:%M"), hard_deadline.strftime("%H:%M"), class_end.strftime("%H:%M"),
-                )
-                class_end = hard_deadline
 
         stay_seconds = max(0, int((class_end - now).total_seconds()))
         stay_minutes = stay_seconds // 60

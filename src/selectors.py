@@ -54,6 +54,13 @@ ACTIVE_MEETING_INDICATOR = [
     '[data-tid="join-btn"]',
 ]
 
+# Join button near participant count (only present on currently active meetings)
+ACTIVE_MEETING_JOIN_BUTTON = [
+    '[data-tid="join-btn"]',
+    'div:has-text(" joined") >> button:has-text("Join")',
+    'div:has-text(" people") >> button:has-text("Join")',
+]
+
 # ---------------------------------------------------------------------------
 # Pre-join screen (mic/camera toggles + "Join now" button)
 # ---------------------------------------------------------------------------

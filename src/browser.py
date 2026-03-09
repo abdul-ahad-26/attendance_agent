@@ -166,26 +166,13 @@ class BrowserManager:
             except Exception:
                 pass
 
-    def navigate_to_teams(self) -> None:
-        """Navigate to Teams web app and wait for redirects to settle."""
+    def _wait_for_teams_load(self, max_attempts: int = 15, interval_ms: int = 2_000) -> bool:
+        """Poll until Teams is loaded. Returns True if successful."""
         page = self.page
-        current = page.url
-        if not _is_teams_url(current):
-            logger.info("Navigating to Teams...")
-            page.goto(TEAMS_URL, wait_until="domcontentloaded", timeout=60_000)
-
-        # Grant permissions for the actual current origin (covers redirects)
-        self._grant_media_permissions()
-
-        # Wait for redirects to settle (teams.microsoft.com -> teams.cloud.microsoft)
-        logger.info("Waiting for Teams to load (current URL: %s)...", page.url)
-        for _ in range(15):
-            page.wait_for_timeout(2_000)
+        for _ in range(max_attempts):
+            page.wait_for_timeout(interval_ms)
             url = page.url
-            logger.debug("Current URL: %s", url)
             on_login = any(lurl in url for lurl in LOGIN_URLS)
-
-            # Auto-dismiss Teams in-app mic/camera permission overlay
             try:
                 allow_btn = page.locator('button:has-text("Allow")').first
                 if allow_btn.is_visible(timeout=500):
@@ -193,11 +180,38 @@ class BrowserManager:
                     logger.info("Dismissed mic/camera permission dialog.")
             except Exception:
                 pass
-
             if _is_teams_url(url) and not on_login:
                 logger.info("Teams loaded. URL: %s", url)
-                return
-        logger.warning("Teams may not have fully loaded. URL: %s", page.url)
+                return True
+        return False
+
+    def navigate_to_teams(self) -> None:
+        """Navigate to Teams web app and wait for redirects to settle."""
+        page = self.page
+        current = page.url
+        if not _is_teams_url(current):
+            logger.info("Navigating to Teams...")
+            try:
+                page.goto(TEAMS_URL, wait_until="domcontentloaded", timeout=60_000)
+            except Exception as e:
+                logger.warning("page.goto() raised: %s — will still attempt to wait.", e)
+
+        self._grant_media_permissions()
+        logger.info("Waiting for Teams to load (current URL: %s)...", page.url)
+
+        if self._wait_for_teams_load():
+            return
+
+        logger.warning("Teams not loaded after 30s. Reloading...")
+        try:
+            page.reload(wait_until="domcontentloaded", timeout=60_000)
+        except Exception as e:
+            logger.warning("page.reload() raised: %s", e)
+
+        if self._wait_for_teams_load():
+            return
+
+        raise RuntimeError(f"Teams failed to load after reload. Current URL: {page.url}")
 
     def is_logged_in(self) -> bool:
         """Check if the user is currently logged in to Teams.

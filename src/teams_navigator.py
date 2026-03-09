@@ -122,7 +122,7 @@ def is_meeting_active(page: Page) -> bool:
 
 def click_join_meeting(page: Page) -> bool:
     """Click the Join button on the ACTIVE meeting in the channel."""
-    # First try the notification popup Join button (most specific to active meeting)
+    # 1. Notification popup (most specific)
     try:
         notif_join = page.locator('div:has-text("started the meeting") >> button:has-text("Join")').last
         if notif_join.is_visible(timeout=2_000):
@@ -132,7 +132,26 @@ def click_join_meeting(page: Page) -> bool:
     except Exception:
         pass
 
-    # Click the LAST Join button on the page (active meeting = most recent)
+    # 2. Scroll to bottom to surface most recent meeting card
+    try:
+        page.keyboard.press("Control+End")
+        page.wait_for_timeout(1_000)
+    except Exception:
+        pass
+
+    # 3. Join button near participant count (active meeting signal)
+    for sel in selectors.ACTIVE_MEETING_JOIN_BUTTON:
+        try:
+            loc = page.locator(sel).last
+            if loc.is_visible(timeout=2_000):
+                loc.click()
+                logger.info("Clicked Join via active meeting selector: %s", sel)
+                return True
+        except Exception:
+            continue
+
+    # 4. Fallback: last Join button on page
+    logger.warning("Falling back to last Join button on page.")
     return _click_last(page, selectors.MEETING_JOIN_BUTTON, timeout=10_000, description="Join meeting")
 
 

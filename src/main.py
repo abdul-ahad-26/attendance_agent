@@ -11,7 +11,7 @@ import logging
 import signal
 import sys
 
-from .browser import BrowserManager
+from .browser import BrowserManager, _is_debug_port_open, REMOTE_DEBUG_PORT
 from .config_loader import ClassEntry, Config, load_config
 from .meeting_joiner import MeetingJoiner
 from .notifier import Notifier
@@ -118,24 +118,40 @@ def mode_scheduler(config: Config) -> None:
         headless=config.settings.browser.headless,
         channel=config.settings.browser.channel,
     )
+    browser_started = False
 
-    browser.start()
+    def _ensure_browser_ready() -> bool:
+        nonlocal browser_started
+        if not browser_started:
+            browser.start()
+            browser_started = True
+            try:
+                browser.navigate_to_teams()
+            except RuntimeError as e:
+                logger.error("Teams failed to load: %s", e)
+                return False
+            if not browser.is_logged_in():
+                logger.error("Not logged in! Run: uv run attendance-agent --login")
+                notifier.session_expired()
+                return False
+            logger.info("Session valid.")
+        return True
 
-    # Verify session on startup
-    browser.navigate_to_teams()
-    if not browser.is_logged_in():
-        logger.error("Not logged in! Run: python -m src.main --login")
-        notifier.session_expired()
-        browser.close()
-        sys.exit(1)
-
-    logger.info("Session valid. Starting scheduler...")
+    if _is_debug_port_open(REMOTE_DEBUG_PORT):
+        logger.info("Existing browser detected on port %d. Connecting...", REMOTE_DEBUG_PORT)
+        if not _ensure_browser_ready():
+            sys.exit(1)
+    else:
+        logger.info("No browser running. Will open when first class triggers.")
 
     joiner = MeetingJoiner(browser, config.settings, notifier)
 
     def on_class_triggered(entry: ClassEntry, leave_by=None) -> None:
         """Called in the main thread when it's time to join a class."""
         logger.info("Triggered: %s", entry.name)
+        if not _ensure_browser_ready():
+            notifier.join_failed(entry.name, "Browser failed to start")
+            return
         try:
             joiner.join_class(entry, leave_by=leave_by)
         except Exception as e:
